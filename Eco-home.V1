@@ -1,0 +1,103 @@
+
+## MASTER SPECIFICATION SHEET: ADVANCED HYDROTHERMAL CLIMATE CORE## [1] STRUCTURAL ENVELOPE DIMENSIONS
+
+       EXTERIOR FACE (Weather Boundary)
++---------------------------------------------+
+
+|  2x4 LSL Stud Layer (3.5" Depth, 16" o.c.)  |
++=============================================+
+
+|                                             |
+|  Continuous Divorced Core (6.0" Depth)      |
+|  - Encapsulated in Closed-Cell Spray Foam   |
+|                                             |
++=============================================+
+
+|  2x4 LSL Stud Layer (3.5" Depth, 16" o.c.)  |
++---------------------------------------------+
+
+|  Airtight Gasketed Drywall Face             |
++---------------------------------------------+
+       INTERIOR FACE (Conditioned Space)
+
+
+* Total Assembly Thickness: 13.0 Inches
+* Framing Selection: 2x4 Laminated Strand Lumber (LSL) / Laminated Veneer Lumber (LVL)
+* Framing Grid Geometry: 16 Inches On-Center (22% Total Framing Fraction)
+* Divorced Cavity Isolation: 6.0-Inch completely independent clear air gap separating interior and exterior framing planes
+* Top Boundary Connector: Factory-engineered parallel-chord roof trusses / energy heel trusses spanning both top plates across the 13-inch footprint. Eliminates the need for manual wood gussets.
+* Air Seal Intersection: Airtight drywall method combined with compressed EPDM/closed-cell drywall gasket tape applied to the 1.5-inch face of the LSL studs before sheet placement. Prevents framing-edge micro-fissures from leaking air.
+
+------------------------------
+## [2] THERMODYNAMIC CORRIDOR & THERMAL BATTERY## Core Thermal Battery Matrix
+
+* Primary Vessel: Vertical steel-jacketed water columns acting as a fluid thermal mass.
+* Storage Limit Strategy: Active predictive feed-forward loops throttling input below a hard 185°F ceiling to prevent phase-change boiling.
+* Input Array (Optics): Spherical Fresnel "Ray-Bender" lenses feeding solar energy down highly reflective mirrored tubes.
+* Summer Rejection Mechanism: Mirrored assemblies mounted onto horizontal rotational bearings. Automatically pivots away to shade the column core when the indoor space demands cooling, allowing the cold water mass to act as a sensible cooling sink.
+* Emergency Energy Injection: Multi-fuel biomass furnace (capable of running on wood pellets or corn) utilizing a secondary exterior-drawn air loop to prevent home depressurization. Combustible air outputs loop through a bypass duct network wrapping around the Trombe column jacket, slow-charging the core mass.
+
+------------------------------
+## [3] UNDER-FLOOR DOUBLE PLENUM PLUMBING## Air Circulation & Purification Map
+
+* Crawl Space Design: Completely sealed, insulated, encapsulated double-plenum floor footprint.
+* Filtration Barrier: Industrial-grade HEPA filtration system positioned immediately ahead of the primary air routing loops.
+* Latent Load Regulator: Polymer desiccant mats separating the supply plenum from the return plenum. Handles moisture passively during night runs.
+* Active Mechanical Dehumidifier: Split DX dehumidifier working in tandem with a low-BTU air conditioning split compressor to separate latent moisture management from sensible temperature cooling cycles.
+
+------------------------------
+## [4] POWER MANAGEMENT & ELECTRICAL MATRIX## Split-Voltage Hybrid System
+
+* High-Voltage Generation: 18.75 kW Solar PV Array configured in high-voltage series strings (150V–250V DC) to minimize voltage drop between the roof and the central power plant.
+* Power Core Capacity: 30 kWh Centralized LiFePO4 battery bank configured to a native 48V DC bus to balance efficiency and safe current loads.
+* Heavy Lifting AC Bus (120V/240V AC via Inverter): Powers the split air conditioner compressor, high-pressure dehumidifier pump, and the multi-fuel furnace ignition/auger assemblies.
+* Low Voltage DC Bus (Native 12V DC): Fed via industrial 48V-to-12V buck converters located at regional sub-panels. Runs the microcontrollers, communication networks, LED lighting, and motorized mechanical components.
+
+## 12V DC Mechanical Air Control
+
+* Damper Selection: Commercial-grade Belimo 12V DC/proportional high-torque actuators (45 to 90 in-lbs).
+* Parasitic Load Prevention: Internal mechanical braking design with pulsed software signaling. Actuators draw near-zero wattage once their 90-second mechanical stroke completes.
+* Wiring Specification: Multi-strand copper conductors (resistant to low-frequency equipment vibration).
+
+------------------------------
+## [5] MICROCONTROLLER DETECTIVE ARCHITECTURE## The 8-Zone Smart Telemetry Bus
+
+   1. Zone 1: Open Air Living Space (Sensible and Latent Comfort Matrix)
+   2. Zone 2: Crawl Space / Primary Pressurized Supply Plenum
+   3. Zone 3: Outer Steel Wall Surface Temperature of Trombe Column
+   4. Zone 4: Internal Core Fluid Temperature of Trombe Column
+   5. Zone 5: Convection Core Internal Heat Rod Temperature
+   6. Zone 6: Multi-Fuel Furnace Duct Flow Exhaust Temperature
+   7. Zone 7: External Ambient Environment Temperature
+   8. Zone 8: Continuous Dew-Point Calculations (Active Humidity Nodes across all points)
+
+## System Management Logic
+
+* Primary Controller: Redundant Arduino hardware nodes running bare-metal C++ over a local hardwired RS-485 Modbus loop.
+* Secondary Telemetry/Logging: Low-power localized Home Assistant server pulling real-time stats without access to critical relay safety lines.
+* Fail-Safe Loops: Enabled Hardware Watchdog Timers (WDT) with Two-Out-of-Three (2oo3) voting logic scripts across microcontrollers to catch and bypass failed sensor anomalies.
+* Power Loss Default: Shading mirrors held in active solar focus via a normally open low-power relay grid. Complete power depletion instantly triggers a fail-safe capacitor or battery backup to drop the relay, automatically rotating the optics into a safe shade alignment.
+
+------------------------------
+## [6] BOUNDARY PRESSURE SEALS
+
+          HIGH-HUMIDITY AREA                     |  DRY HARDWARE AREA
+=================================================|=========================
+Stranded Cable Pack --> [ Mates to Marine Plug ] |
+
+                             |                   |
+                             v                   |
+               +---------------------------------+
+
+               |  Threaded Metal M12 Connector   |
+               |  - Compression Gasket to Wall   |
+               |  - Solid Molded Pins            | <-- Breaks inter-strand
+               +---------------------------------+     air & capillary paths
+
+
+* Penetration Strategy: Passing wires through pressure boundaries via True Pin-and-Socket Bulkhead Connectors instead of traditional pressure cable glands.
+* Capillary Migration Protection: Solid molded glass/polymer pin inserts stop moisture and vapor tracking inside multi-strand wire insulation jackets.
+* Low-Voltage Data Links: Threaded industrial M12 circular connectors with gold-plated contacts to prevent pin oxidation and maintain data integrity.
+* High-Amperage Links: Industrial Deutsch DT or Amphenol Eco|mate connectors rated for 13A–25A current loads.
+* Mechanical Wall Gasketing: Bulkhead connectors utilize closed-cell neoprene gaskets or marine-grade polyurethane adhesive (3M 5200) clamped directly to the framing surface.
+
