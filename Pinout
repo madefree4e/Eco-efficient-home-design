@@ -1,0 +1,194 @@
+------------------------------
+## 6. Arduino Control Hardware Pinout & Schematics
+
+### 6.1 Microcontroller Target
+* **Platform:** Arduino Mega 2560 / ESP32 with 5V logic conversion (Recommended for high I/O count and isolated hardware timer PWM).
+* **Isolation:** All relay outputs and inductive loads (fans, solenoids, dampers) are isolated via optocouplers on dedicated relay boards with separate power supplies to prevent EMI/transient noise.
+
+### 6.2 Pin Assignment Matrix
+
+| Pin ID | Component Name | Direction | Signal Type | Function / Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **D2** | 1-Wire Temp Array Bus | Input | Digital (1-Wire) | Connects DS18B20 sensors (Lower Tank, Upper Tank, Duct Air, Ambient, Condenser Line) |
+| **D3** | 10" Centrifugal Fan PWM | Output | Hardware PWM (Timer) | 25kHz PWM output to fan driver / speed controller |
+| **D4** | Fan AC Power Relay | Output | Digital (Active LOW) | Opto-isolated relay enabling AC main power to centrifugal fan |
+| **D5** | Motorized Damper Open | Output | Digital (Active LOW) | Drives open state for top register motorized airflow damper |
+| **D6** | Motorized Damper Close | Output | Digital (Active LOW) | Drives close state for top register motorized airflow damper |
+| **D7** | 3-Way Freon Solenoid Relay | Output | Digital (Active LOW) | Winter: Energized (Diverts hot gas to sub-condenser). Summer: De-energized (Bypass) |
+| **D8** | AC Compressor Contactor Relay | Output | Digital (Active LOW) | Controls 2-Ton Split-System AC unit state for summer thermal charging |
+| **D9** | Sensor Power Gate (VCC_SENSE) | Output | Digital (5V) | Pulsed power pin to energize moisture/leak sensors for <5ms every 10s |
+| **A0** | Drain Pan Moisture Sensor | Input | Analog (0–5V) | Resistance measurement for auxiliary drain pan dual-pin sensor |
+| **A1** | Bell Flare Rope Leak Sensor | Input | Analog (0–5V) | Resistance measurement for 30° bell flare rope leak detection loop |
+| **A2** | Upper Nitrogen Pressure | Input | Analog (0.5–4.5V) | 0–10 PSI static pressure transducer (Nitrogen expansion space monitoring) |
+| **D13** | System Alarm LED / Status | Output | Digital | Visual indicator for fault states (Leaks, Over-temp >185°F, Sensor Failure) |
+
+---
+
+## 7. Control Loop Logic & Firmware Architecture
+
+### 7.1 Galvanic Corrosion Prevention Protocol
+To prevent galvanic decay on copper/steel moisture pins and rope sensors inside high-humidity zones, power is strictly gated:
+1. `VCC_SENSE` (Pin D9) remains `LOW` (0V) during standard operation.
+2. Every 10 seconds, `VCC_SENSE` pulses `HIGH` (5V) for **3 milliseconds**.
+3. Analog reads on `A0` and `A1` occur at $t = 2\text{ ms}$.
+4. `VCC_SENSE` immediately drops to `LOW`.
+### 7.2 State Machine Operational Flow
+---+-----------------------+
+              |    SYSTEM INITIAL     |
+              |  Read Temperatures    |
+              +-----------+-----------+
+                          |
+          +---------------+---------------+
+          |                               |
+   [ Winter Mode ]                 [ Summer Mode ]
+          |                               |
+T_tank > T_target ?            Peak Solar / Grid Shave?
+/               \                  /            \
+
+## 8. C++ Firmware Structure Skeleton
+
+```cpp
+/*
+ * V2 Monolithic Steel Trombe Column - System Controller
+ * Board: Arduino Mega 2560
+ */
+
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// Pin Definitions
+#define ONE_WIRE_BUS 2
+#define FAN_PWM_PIN 3
+#define FAN_RELAY_PIN 4
+#define DAMPER_OPEN_PIN 5
+#define DAMPER_CLOSE_PIN 6
+#define REFRIGERANT_SOLENOID_PIN 7
+#define COMPRESSOR_RELAY_PIN 8
+#define SENSOR_POWER_PIN 9
+
+#define MOISTURE_PAN_PIN A0
+#define LEAK_ROPE_PIN A1
+#define PRESSURE_TRANSDUCER_PIN A2
+
+// System Limits & Thresholds
+const float TEMP_HIGH_CUTOFF = 185.0; // °F Max Fluid Temp
+const float TEMP_ROOM_TARGET = 65.0;  // °F Winter Target
+const int LEAK_THRESHOLD = 200;       // ADC Raw Threshold for Water Detection
+
+// Timing Constants
+const unsigned long SENSOR_INTERVAL = 10000; // 10 seconds
+unsigned long lastSensorReadTime = 0;
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+// Temperature Readings Cache
+float tempLowerTank = 0.0;
+float tempUpperTank = 0.0;
+float tempDuctAir = 0.0;
+float tempAmbient = 0.0;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Output Pins Setup
+  pinMode(FAN_PWM_PIN, OUTPUT);
+  pinMode(FAN_RELAY_PIN, OUTPUT);
+  pinMode(DAMPER_OPEN_PIN, OUTPUT);
+  pinMode(DAMPER_CLOSE_PIN, OUTPUT);
+  pinMode(REFRIGERANT_SOLENOID_PIN, OUTPUT);
+  pinMode(COMPRESSOR_RELAY_PIN, OUTPUT);
+  pinMode(SENSOR_POWER_PIN, OUTPUT);
+  
+  // Safe Default Relay States (Active LOW Relays -> HIGH = OFF)
+  digitalWrite(FAN_RELAY_PIN, HIGH);
+  digitalWrite(DAMPER_OPEN_PIN, HIGH);
+  digitalWrite(DAMPER_CLOSE_PIN, HIGH);
+  digitalWrite(REFRIGERANT_SOLENOID_PIN, HIGH);
+  digitalWrite(COMPRESSOR_RELAY_PIN, HIGH);
+  digitalWrite(SENSOR_POWER_PIN, LOW); // Galvanic protection default
+
+  sensors.begin();
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // 1. Periodic Non-Blocking Galvanic Sensor Loop (Every 10s)
+  if (currentMillis - lastSensorReadTime >= SENSOR_INTERVAL) {
+    lastSensorReadTime = currentMillis;
+    checkMoistureSensors();
+    readTemperatures();
+  }
+
+  // 2. Main Control Loop Execution
+  evaluateThermalLogic();
+}
+
+void checkMoistureSensors() {
+  // Pulse sensor power for 3ms to eliminate galvanic corrosion
+  digitalWrite(SENSOR_POWER_PIN, HIGH);
+  delay(2); // Short stabilization wait
+
+  int panMoisture = analogRead(MOISTURE_PAN_PIN);
+  int ropeLeak = analogRead(LEAK_ROPE_PIN);
+
+  digitalWrite(SENSOR_POWER_PIN, LOW); // Instantly cut power
+
+  // Emergency Fault Interlock
+  if (panMoisture > LEAK_THRESHOLD || ropeLeak > LEAK_THRESHOLD) {
+    triggerSystemEmergencyShutdown("LEAK DETECTED IN CRAWL SPACE / BELL FLARE");
+  }
+}
+
+void readTemperatures() {
+  sensors.requestTemperatures();
+  tempLowerTank = sensors.getTempFByIndex(0);
+  tempUpperTank = sensors.getTempFByIndex(1);
+  tempDuctAir   = sensors.getTempFByIndex(2);
+  tempAmbient   = sensors.getTempFByIndex(3);
+
+  // High Temperature Safety Interlock
+  if (tempLowerTank >= TEMP_HIGH_CUTOFF) {
+    triggerSystemEmergencyShutdown("OVER-TEMPERATURE CUTOFF EXCEEDED (>185F)");
+  }
+}
+
+void evaluateThermalLogic() {
+  // Example PWM scaling for 10" Centrifugal Fan based on Lower Tank Heat
+  if (tempLowerTank > (tempAmbient + 10.0) && tempAmbient < TEMP_ROOM_TARGET) {
+    // Open damper and turn on fan
+    digitalWrite(DAMPER_OPEN_PIN, LOW);
+    digitalWrite(FAN_RELAY_PIN, LOW);
+    
+    // Scale PWM (0-255) based on thermal differential
+    int fanSpeed = map((int)tempLowerTank, 70, 185, 80, 255);
+    analogWrite(FAN_PWM_PIN, constrain(fanSpeed, 80, 255));
+  } else {
+    // Thermal condition satisfied or inactive daylight heat soak
+    analogWrite(FAN_PWM_PIN, 0);
+    digitalWrite(FAN_RELAY_PIN, HIGH);
+    digitalWrite(DAMPER_OPEN_PIN, HIGH);
+  }
+}
+
+void triggerSystemEmergencyShutdown(const char* reason) {
+  Serial.print("CRITICAL FAULT: ");
+  Serial.println(reason);
+  
+  // Cut all active loads immediately
+  analogWrite(FAN_PWM_PIN, 0);
+  digitalWrite(FAN_RELAY_PIN, HIGH);
+  digitalWrite(COMPRESSOR_RELAY_PIN, HIGH);
+  digitalWrite(REFRIGERANT_SOLENOID_PIN, HIGH);
+  
+  // Close dampers to isolate column
+  digitalWrite(DAMPER_OPEN_PIN, HIGH);
+  digitalWrite(DAMPER_CLOSE_PIN, LOW);
+  
+  while (true) {
+    // Halt execution until manual hard-reset
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+    delay(250);
+  }
+}
